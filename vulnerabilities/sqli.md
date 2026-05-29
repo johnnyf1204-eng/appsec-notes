@@ -216,3 +216,75 @@ password out of the error.
 **Labs completed:**
 - Extracting sensitive data via verbose SQL error messages — used CAST 
 to trigger a type error, password leaked directly in the error response
+
+---
+ 
+### Time-based blind
+ 
+The hardest blind technique. Unlike conditional responses (welcome back
+or not) and conditional errors (500 vs 200), here there is no visible
+difference in the response at all — nothing changes no matter what you
+do. The only signal you have is whether the page takes longer to respond.
+You trigger a time delay when a condition is true, nothing when false.
+That's your only way to prove anything about the data inside the database.
+ 
+**The payloads by database:**
+ 
+| Database | Payload |
+|---|---|
+| PostgreSQL | `'||pg_sleep(10)--` |
+| MySQL | `' AND SLEEP(10)--` |
+| MSSQL | `'; WAITFOR DELAY '0:0:10'--` |
+| Oracle | `'||dbms_pipe.receive_message(('a'),10)--` |
+ 
+**Why PostgreSQL and Oracle use `||` instead of `;` or `AND`:**
+Those two databases don't reliably allow stacked queries — meaning you
+can't end the original query with `;` and start a new one. `||` keeps
+you inside the original query. The database has to evaluate `pg_sleep`
+or `dbms_pipe` to build the string, and the delay happens as a side
+effect of that evaluation. MSSQL and MySQL allow stacked queries or
+inline conditions so you can use `AND` or `;` directly.
+ 
+Even though PortSwigger's cheat sheet says PostgreSQL supports `;`
+stacking, whether it actually works depends on the app's database
+driver and how the developer wrote the query execution code. When
+stacked queries fail, `||` inline concatenation is your fallback for
+PostgreSQL and Oracle.
+ 
+**The actual process on an unknown target:**
+ 
+```
+Try each DB's time delay payload one by one
+    ↓
+Page hangs ~10 seconds = DB confirmed + injection confirmed in one shot
+    ↓
+Nothing works? → Suspect the HTTP layer before suspecting your SQL
+    ↓
+URL encode your special characters and retry
+```
+ 
+**The HTTP layer problem:**
+There are two layers between you and the database — HTTP and SQL. When
+something doesn't work you have to figure out which layer is the problem.
+ 
+If you're injecting into a cookie, `;` has a specific meaning in HTTP —
+it's the separator between cookies. So `TrackingId=xyz'; SELECT...`
+gets split by HTTP before it ever reaches the database. The SQL query
+only receives the part before the `;`. The fix is URL encoding:
+ 
+- `;` → `%3B`
+- space → `+` or `%20`
+- `'` → `%27` if it's getting stripped
+**My insight:**  The skill is knowing
+what to try and in what order, not magically knowing which DB it is
+upfront. Time-based blind is considered the most painful SQLi technique
+even in real bug bounties because you're flying completely blind and
+every character matters.
+ 
+**Labs completed:**
+- Blind SQLi with time delays — confirmed PostgreSQL using `||pg_sleep(10)--`
+inside a cookie, page delayed 10 seconds confirming injection
+- Blind SQLi with time delays and conditional extraction — had to URL
+encode `;` as `%3B` and space as `+` because the cookie HTTP layer was
+treating `;` as a cookie separator and eating the rest of the payload
+ 
