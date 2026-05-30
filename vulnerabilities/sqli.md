@@ -288,3 +288,47 @@ inside a cookie, page delayed 10 seconds confirming injection
 encode `;` as `%3B` and space as `+` because the cookie HTTP layer was
 treating `;` as a cookie separator and eating the rest of the payload
  
+
+ ---
+
+
+ ### Out-of-band (OOB)
+
+Used when the app runs the SQL query in a background thread — meaning
+the result never comes back through the HTTP response at all. UNION,
+error-based, and all blind techniques break because there's nothing
+to observe. The query runs, but you're already gone.
+
+**The idea:**
+Instead of pulling data back through HTTP, you make the database
+call out to a server you control. You encode the data you want
+into the request itself — usually as a DNS subdomain:
+
+```sql
+password123.yourserver.com
+```
+
+The database tries to resolve that domain. Your server receives the
+DNS lookup. You read the stolen value straight out of the subdomain.
+Data never touched the HTTP response.
+
+**Why databases can even do this:**
+This was the click for me. Nobody added "exfiltrate data" as a
+feature. They added things like fetching remote files, calling
+web services, sending emails from stored procedures — legitimate
+automation features enterprises actually used. DNS lookups happen
+automatically as a side effect of any network call. The attack
+is just that side effect, weaponized.
+
+| Database | Feature abused |
+|---|---|
+| SQL Server | `xp_dirtree` — meant for network share enumeration |
+| Oracle | `UTL_HTTP` — meant for calling web services from PL/SQL |
+| MySQL | `LOAD_FILE` with UNC path — meant for reading network files |
+
+**My insight:** the most dangerous vulns often aren't broken code —
+they're legitimate features used in ways the designer never intended.
+
+
+**Tool:** Burp Collaborator (Pro) or interactsh (free alternative).
+The OOB labs need Collaborator skipped for now, understood the concept,
