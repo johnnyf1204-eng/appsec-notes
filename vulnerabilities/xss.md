@@ -211,19 +211,14 @@ Injection attacks all share the same root cause: the boundary between data and c
 ---
 
 ## Labs completed
-
-### Reflected & Stored XSS
-- Reflected XSS into HTML context (no encoding)
-- Stored XSS into HTML context (no encoding)
-
-### DOM XSS (core sinks)
-- DOM XSS in `document.write` using `location.search`
-- DOM XSS in `innerHTML` using `location.search`
-- DOM XSS in `document.write` inside a `<select>` element using `location.search`
-
-### jQuery-based DOM XSS
-- DOM XSS in jQuery anchor `href` attribute sink using `location.search`
-- DOM XSS in jQuery selector sink using hashchange event
-
-### Framework-based XSS
-- DOM XSS in AngularJS expression with encoded characters
+ 
+### Apprentice
+- Reflected XSS into HTML context, no encoding — injected `<script>alert(1)</script>` in search, fired immediately
+- Stored XSS into HTML context, no encoding — injected payload in comment field, fires on every page load for every visitor
+- DOM XSS in `document.write` sink using source `location.search` — input lands in document.write, broke out of surrounding tags, injected img onerror payload
+- DOM XSS in `innerHTML` sink using source `location.search` — input lands in innerHTML, used img onerror payload since script tags don't execute there
+- DOM XSS in jQuery anchor `href` attribute sink using `location.search` source — input lands in href attribute, used javascript: protocol payload, clicked back link to fire
+- DOM XSS in jQuery selector sink using a hashchange event — delivered iframe exploit, chained hashchange event to inject HTML via $() sink
+### Practitioner
+- DOM XSS in `document.write` sink using source `location.search` inside a select element — found dead/orphaned code reading storeId from URL that was never used in normal flow, broke out of option and select tags with `</option></select>`, injected img onerror payload
+- DOM XSS in AngularJS expression with angle brackets and double quotes HTML-encoded — found ng-app on page, confirmed injection with `{{2+2}}`, used `{{$on.constructor('alert(1)')()}}` to escape Angular sandbox via Function constructor
