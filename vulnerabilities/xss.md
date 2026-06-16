@@ -563,3 +563,59 @@ Context is everything in XSS. The same payload that works in raw HTML does nothi
 ### Theory understood, lab skipped (requires Burp Pro / Collaborator)
 - Exploiting XSS to steal cookies - stored XSS payload reads document.cookie and exfiltrates to external server via fetch, session hijack from there
 - Exploiting XSS to capture passwords - stored XSS injects hidden form fields, browser autofills saved credentials, JS reads the values and sends them out
+## How to prevent XSS
+
+Prevention isn't one thing. It's a layered approach where each layer covers the gaps in the one before it.
+
+### Layer 1: Encode output
+
+The primary defense. Every piece of user-controlled data that gets written into a page needs to be encoded for the context it's landing in. The browser then treats it as data, not code.
+
+Different contexts need different encoding:
+
+- **HTML context** (between tags): encode `<` as `&lt;`, `>` as `&gt;`, `"` as `&quot;`, `'` as `&#x27;`, `&` as `&amp;`
+- **HTML attribute context**: same HTML encoding, but also make sure the attribute is always wrapped in quotes so there's nothing to break out of
+- **JavaScript context**: use a proper JS encoder, not just HTML encoding. `\u0022` for `"`, `\u003c` for `<` etc. HTML encoding `<` as `&lt;` inside a script block does nothing because JS isn't looking for HTML entities
+- **URL context**: percent-encode user input before putting it in a URL. Validate that href values start with `http` or `https`, not `javascript:`
+
+The right encoding depends on where the data lands. Encoding for the wrong context either breaks the page or leaves you exposed.
+
+### Layer 2: Validate input on arrival
+
+Encoding handles output. Validation handles input. They're not interchangeable.
+
+Whitelist over blacklist. Checking that an email looks like an email is more robust than trying to strip out `<script>` tags. Blacklists get bypassed constantly because attackers find representations the filter didn't anticipate. Whitelists define exactly what's allowed and reject everything else.
+
+Input validation is a secondary defense though, not a primary one. You can't validate your way out of XSS without output encoding, because the same data often needs to be rendered back somewhere.
+
+### Layer 3: Use safe APIs and sinks
+
+The simplest fix for DOM XSS is not using dangerous sinks in the first place.
+
+- Use `textContent` or `innerText` instead of `innerHTML` when inserting user data into the DOM. These treat the input as plain text and never parse it as HTML, so no tag injection is possible regardless of what the input contains.
+- Avoid `document.write` entirely. It's legacy, unsafe, and has no modern use case that a safe alternative can't cover.
+- Don't pass user input to `eval`, `setTimeout(string)`, `setInterval(string)`, or `new Function(string)`. These all execute strings as code.
+- For `href` values, validate that the URL scheme is `http` or `https` before setting it. Never set `href` to raw user input without checking this first.
+
+### Layer 4: Content Security Policy
+
+CSP as a second line of defense. The idea is that even if an injection slips through encoding, CSP prevents the injected script from running.
+
+A tight CSP for XSS prevention:
+
+```
+Content-Security-Policy: script-src 'self' 'nonce-randomvalue'; object-src 'none'; base-uri 'none';
+```
+
+- `script-src 'self'` locks scripts to same-origin
+- Adding a nonce means inline scripts only run if they carry the matching nonce, blocking injected inline scripts
+- `object-src 'none'` closes the Flash/plugin vector which can also execute scripts
+- `base-uri 'none'` prevents injecting a `<base>` tag that would change the base URL for all relative links on the page
+
+CSP is not a replacement for output encoding. A broken nonce implementation or a missing directive can still be bypassed, as we've seen. It's a safety net, not the primary fix.
+
+### Why these layers together
+
+Encoding stops the injection from being interpreted as code. Input validation catches malformed data before it enters the system. Safe sinks eliminate the dangerous code paths entirely. CSP catches whatever slips through all of that.
+
+Real apps get XSS not because they did zero encoding, but because one context was handled differently, or one developer used innerHTML when they should have used textContent, or one template bypassed the framework's auto-encoding. Defense in depth means those individual failures don't automatically result in a successful attack.
