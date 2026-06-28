@@ -79,3 +79,55 @@ Apps leak more than they think through error messages and timing.
 Brute force protections are often bypassable because they trust client controlled inputs like IP headers and counters.
 MFA only works if the app actually enforces that every step was completed before granting access.
 Never trust user controlled input to determine whose session or account an action applies to.
+
+---
+
+## Other authentication mechanisms
+
+### Stay logged in cookies
+
+A lot of apps implement a remember me feature using a persistent cookie. The cookie is supposed to be impossible to guess but some apps build it from predictable values.
+
+In the lab the cookie was just base64 encoded and decoded to username:password where the password was md5 hashed. Since we could log in with our own account and study our own cookie we figured out the formula. Then we built a payload that takes every password from a wordlist, hashes it with md5, base64 encodes username:hash, and sends it as the cookie value until the app accepts one.
+
+Why it is weak: the construction is predictable, the encoding is reversible, and md5 with no salt means common passwords are crackable instantly.
+
+### Offline password cracking
+
+If an attacker cannot brute force directly, they can still crack the cookie offline if they can get it first.
+
+In the lab we used XSS to steal the victim's stay-logged-in cookie. We decoded it from base64 and got the md5 hash of their password. We pasted the hash into crackstation which has precomputed hashes for millions of common passwords and it returned the original password instantly.
+
+This works because md5 with no salt produces the same hash every time for the same input. Sites like crackstation just store a giant lookup table of password to hash pairs.
+
+### What salt is and why it matters
+
+Salt is a random string the app adds to your password before hashing it. Instead of hashing `password123` the app hashes `rAnD0mStRiNg_password123` and stores the salt alongside the hash.
+
+This kills precomputed lookup tables completely because even if two users have the same password their hashes are different. The offline cracking lab worked specifically because there was no salt so the md5 hash of a common password was already sitting in crackstation's database.
+
+---
+
+## Labs completed (updated)
+
+Username enumeration via different responses
+Username enumeration via subtly different responses
+Username enumeration via response timing
+Broken brute-force protection via X-Forwarded-For bypass
+Username enumeration via account lock
+2FA simple bypass via direct navigation
+2FA broken logic via username parameter manipulation
+Brute-forcing a stay-logged-in cookie
+Offline password cracking via XSS and hash lookup
+
+---
+
+## Key takeaways (updated)
+
+Apps leak more than they think through error messages and timing.
+Brute force protections are often bypassable because they trust client controlled inputs like IP headers and counters.
+MFA only works if the app actually enforces that every step was completed before granting access.
+Never trust user controlled input to determine whose session or account an action applies to.
+Predictable cookie construction is dangerous even if the values are encoded or hashed.
+MD5 with no salt is effectively plaintext for common passwords because of precomputed lookup tables.
+Salt makes hashes unique per user and kills offline cracking via lookup tables.
