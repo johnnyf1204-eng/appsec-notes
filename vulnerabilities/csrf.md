@@ -150,3 +150,63 @@ function f1() {
 ```
 
 Lab: solved.
+
+---
+
+## Referer-based defenses
+
+Some apps skip CSRF tokens entirely and instead validate the HTTP Referer header, checking that the request came from their own domain. This is weaker than token-based protection and has two common bypass patterns.
+
+## Referer bypass: validation only happens if header is present
+
+The app validates the Referer when it exists but skips validation entirely if the header is missing. So just strip it.
+
+Bypass: add a meta tag to your exploit page that tells the browser not to send the Referer header at all.
+
+```html
+<meta name="referrer" content="never">
+```
+
+The browser drops the header, the server sees no Referer, skips the check, and processes the request.
+
+Lab: solved.
+
+## Referer bypass: naive string matching
+
+The app checks that the Referer contains or starts with the target domain, but doesn't parse it properly. That means you can smuggle the expected domain into a part of the URL the app isn't actually checking as a domain.
+
+Two variants:
+
+If the app checks that Referer starts with the expected domain, put the target domain as a subdomain of your attacker domain:
+
+```
+http://vulnerable-website.com.attacker.com/csrf-attack
+```
+
+If the app just checks that the Referer contains the target domain anywhere, put it in the query string:
+
+```
+http://attacker.com/csrf-attack?vulnerable-website.com
+```
+
+One catch: modern browsers strip the query string from the Referer by default. Fix that by setting this header on your exploit server's response:
+
+```
+Referrer-Policy: unsafe-url
+```
+
+That forces the browser to send the full URL including query string.
+
+Lab: solved.
+
+---
+
+## Preventing CSRF
+
+**CSRF tokens** are the strongest defense. A valid token needs to be unpredictable, tied to the user's session, and validated on every state-changing request regardless of method. Transmit it as a hidden form field in a POST, never in a cookie, never in the URL. If the token is missing entirely, reject the request the same way you'd reject a bad token.
+
+**SameSite=Strict cookies** as a second layer. Strict is the safest default. Only drop to Lax if you have a real reason. Never use None unless you fully understand what you're opening up.
+
+**Cross-origin same-site attacks** aren't stopped by SameSite at all. Isolate sensitive functionality from anything that handles user-uploaded content or has weaker security, even if it lives on a sibling subdomain.
+
+Takeaway: token validation is the core defense, SameSite is the backup. Both need to be in place because each covers gaps the other leaves open.
